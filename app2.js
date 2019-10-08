@@ -1,67 +1,88 @@
 const fetch = require("node-fetch");
+//setting global headers to fetch headers
+global.Headers = fetch.Headers;
+//base-64 module to encode username and passoword
+let base64 = require('base-64');
 const fs = require('fs');
 const moment = require('moment');
 let today = moment();
 
 
-let user = 'vuejs';
-let repo = 'vue-next'
 
-const limitPerPage = 20;
-const apiUrl = `https://api.github.com/repos/${user}/${repo}/pulls`;
 
-const getPulls = async function (pageNo = 1) {
+let urls = JSON.parse(fs.readFileSync('urls.txt'));
 
-    let actualUrl = apiUrl + `?page=${pageNo}&limit=${limitPerPage}`;
-    var apiResults = await fetch(actualUrl)
+
+
+//your git username and password. We need to set these with base64 encoding in the headers to authenticate our api request. Because github api has set limit of only 60 calls per hour for unauthenticated requests. So, if there are more than 60 pulls, the code fails. By using authenticated request(ie by providing our username and password) we can make 5000 api calls per hour. There is one more way of authenticating where we can a token from github.
+let username = 'bhuvanakrishna';
+let password = 'Bhuvanakrishna123$';
+
+//The logic is similar to previous program. We have a function that takes a single url and fetches review comments json from the api
+const getReviewComments = async function (url) {
+
+    //adding 'comments' to each url(api request syntax)
+    let actualUrl = `${url}/comments`;
+    //here we are adding headers for our fetch request.
+    var apiResults = await fetch(actualUrl, {
+        headers: new Headers({
+            'Authorization': 'Basic ' + base64.encode(username + ":" + password)
+        })
+    })
+        //handling the promise(think as response) from the fetch
         .then(resp => {
             return resp.json();
         });
 
+    let i = 0;
+    while (i < apiResults.length) {
+        i++;
+    }
+    console.log("No. of review comments for the pull request, ", url, ":", i);
     return apiResults;
+
 
 }
 
-const getAllPulls = async function (pageNo = 1) {
-    const results = await getPulls(pageNo);
-    //console.log("Retreiving data from API for page : " + pageNo);
-    if (results.length > 0) {
-        return results.concat(await getAllPulls(pageNo + 1));
-    } else {
-        return results;
+
+const getAllComments = async function () {
+    let comment = null;
+    let comments = [];
+    let i = 0;
+
+
+
+    while (i < urls.length) {
+
+        comment = await getReviewComments(urls[i]);
+
+
+        //here we are pushing into the array comments only if there is a comment for a pull request. Comment variable would be -> [] if a particular pull request has no review comment. So, by checking length we are only copying the comments.
+        if (comment.length > 0) {
+            //console.log(comment);
+            comments.push(comment);
+        }
+        i++;
     }
+
+
+    return comments;
+
+
 };
+
+
 
 
 (async () => {
 
-    const entireList = await getAllPulls();
+    const entireList = await getAllComments();
 
-    console.log(entireList.length);
 
-    let filteredList = [];
-    let urls = [];
-    //console.log(entireList);
-
-    for (let i = 0; i < entireList.length; i++) {
-
-        if (today.diff(entireList[i].created_at, 'days') <= 30) {
-            filteredList.push(entireList[i]);
-            urls.push(entireList[i].url);
-        }
-
-    }
-
-    console.log(filteredList.length);
-
-    fs.writeFile('pullslast30days.txt', JSON.stringify(filteredList, null, 4), 'utf8', function (err) {
+    fs.writeFile('comments.txt', JSON.stringify(entireList, null, 4), 'utf8', function (err) {
 
         if (err) console.log('error', err);
     });
 
-    fs.writeFile('urls.txt', JSON.stringify(urls, null, 4), 'utf8', function (err) {
-
-        if (err) console.log('error', err);
-    });
 
 })();

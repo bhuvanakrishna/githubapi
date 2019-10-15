@@ -1,11 +1,18 @@
 //to get fetch api in node
 const fetch = require("node-fetch");
+//setting global headers to fetch headers
+global.Headers = fetch.Headers;
 //file system module
 const fs = require('fs');
 //moment module for working with dates
 const moment = require('moment');
+//base-64 module to encode username and passoword
+let base64 = require('base-64');
+
 //asigning todays's date and time to the variable today
 let today = moment();
+
+
 
 
 //username of the repository. Change this
@@ -16,18 +23,28 @@ let repo = 'godot'
 //api results limit
 const limitPerPage = 20;
 
-const apiUrl = `https://api.github.com/repos/${user}/${repo}/pulls`;
+const apiUrl = `https://api.github.com/repos/${user}/${repo}/pulls?state=all`;
+
+//give your github username and password
+let username = 'bhuvanakrishna';
+let password = 'Bhuvanakrishna123$';
 
 
 //asynchronous function to get pulls from the page given as argument
 const getPulls = async function (pageNo = 1) {
 
-    let actualUrl = apiUrl + `?page=${pageNo}&limit=${limitPerPage}`;
+    let actualUrl = apiUrl + `&page=${pageNo}&limit=${limitPerPage}`;
     //here the fetch method returns a promise(think as response) which is handled by .then. In .then we are converting response into json. Here return resp.json() returns another promise. Had we not used await, we should again handle the promise by writing a second .then. So to avoid multiple .then handling we are using new feature in JS which is called async-await. The function needs to be a async function to use await. That's the reason we are using keyword async before the function above.
     //.then runs ONLY after it gets a promise from the fetch
-    var apiResults = await fetch(actualUrl)
+    var apiResults = await fetch(actualUrl, {
+        headers: new Headers({
+            'Authorization': 'Basic ' + base64.encode(username + ":" + password)
+        })
+    })
         .then(resp => {
-            return resp.json();
+            let respo = resp.json();
+            // console.log(respo);
+            return respo;
         });
 
     //we are returning the apiresults of the pageNo which is sent as argument
@@ -57,7 +74,7 @@ const getAllPulls = async function (pageNo = 1) {
 
     const entireList = await getAllPulls();
 
-    console.log('Total no. of Pull requests on the give repository: ', entireList.length);
+    console.log('Total no. of Pull requests on the given repository: ', entireList.length);
 
     let filteredList = [];
     let urls = [];

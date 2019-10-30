@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="icon" href="./images/favicon.png" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/chartist.js/latest/chartist.min.css"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <link
+      href="https://fonts.googleapis.com/css?family=Oxygen:300"
+      rel="stylesheet"
+      type="text/css"
+    />
+    <meta charset="utf-8" />
+    <title>
+      Github Pull Requests
+    </title>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="heading">
+        <h1>Github <span id="red">Pull</span> Requests</h1>
+        <span><img src="./images/pull2.svg" class="icon" alt=""/></span>
+      </div>
+
+      <input type="text" id="owner" placeholder="Enter Owner of the Repo" />
+      <br />
+      <input type="text" id="repo" placeholder="Enter Repo Name" />
+      <br />
+
+      <div class="selection">
+        <select id="selectPullsType">
+          <option value="open" selected>Open</option>
+          <option value="closed">Closed</option>
+          <option value="all">All</option>
+        </select>
+
+        <select id="selectDays" onchange="selectDays()">
+          <option value="30" selected>Last 30 Days</option>
+          <option value="60">Last 60 Days</option>
+          <option value="90">Last 90 Days</option>
+          <option value="custom" id="custom">Custom</option>
+        </select>
+        <span id="customDaysSpan"></span>
+      </div>
+
+      <button onclick="fetchData()" id="getbutton">Get</button>
+
+      <div id="wrapperForLoader"></div>
+      <div class="renderContent" id="renderContent"></div>
+    </div>
+
+    <div class="chartwrapper" id="chartwrapper">
+      <div class="ct-chart .ct-double-octave" id="ct-chart"></div>
+    </div>
+
+    <div class="footer">
+      <p>Developed By <span style="color: crimson;">Bhuvana Krishna</span></p>
+    </div>
+    <script src="https://cdn.jsdelivr.net/chartist.js/latest/chartist.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.24.0/moment.js"></script>
+
+    <script>
+      window.onload = selectDays();
+
+      function selectDays() {
+        let select = document.getElementById("selectDays");
+        let option = select.options[select.selectedIndex].value;
+
+        if (option === "custom") {
+          document.getElementById("customDaysSpan").innerHTML =
+            '<input id="customDaysInput" placeholder="Enter Days"></input>';
+        } else {
+          document.getElementById("customDaysSpan").innerHTML = "";
+        }
+      }
+
+      async function fetchData() {
+        let pullsType = document.getElementById("selectPullsType").value;
+
+        document.getElementById("renderContent").innerHTML = "";
+        document.getElementById("ct-chart").innerHTML = "";
+
+        let div = document.createElement("div");
+        let element = document
+          .getElementById("wrapperForLoader")
+          .appendChild(div);
+        element.className = "loader";
+        element.id = "loader";
+        let image = document.createElement("img");
+        image = element.appendChild(image);
+        image.src = "./images/loading.gif";
+
+        let e = document.getElementById("selectDays");
+        let days = e.options[e.selectedIndex].value;
+
+        if (days === "custom") {
+          if (!isNaN(document.getElementById("customDaysInput").value)) {
+            days = document.getElementById("customDaysInput").value;
+          } else {
+            alert("Please enter a valid integer");
+            document.getElementById("loader").remove();
+            return undefined;
+          }
+
+          //check if input is a number or not.. use toast.js
+        }
+
+        document.getElementById("getbutton").disabled = true;
+        document.getElementById("selectPullsType").disabled = true;
+        document.getElementById("selectDays").disabled = true;
+
+        let owner = document.getElementById("owner").value;
+        let repo = document.getElementById("repo").value;
+
+        const response = await fetch(
+          // `http://localhost:3000/pull?type=${pullsType}&days=${days}&owner=${owner}&repo=${repo}`
+          `/pull?type=${pullsType}&days=${days}&owner=${owner}&repo=${repo}`,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json"
+            }
+          }
+        );
+
+        // console.log("printing response", response);
+
+        if (response.status == 503) {
+          alert(
+            "You request is taking longer than 30 seconds, which is not supported by Heroku."
+          );
+          location.reload();
+          // return;
+        }
+
+        const myJson = await response.json();
+
+        if (myJson) {
+          let html = `<h3>Number of Pull Requests: <span id="integer">${JSON.stringify(
+            myJson.length
+          )}</span></h3>`;
+
+          document.getElementById("renderContent").innerHTML = html;
+          // document.getElementById("chartwrapper").innerHTML = html;
+        }
+
+        // copy all dates to new array
+        let datesArray = [];
+        for (let i = 0; i < myJson.length; i++) {
+          datesArray.push(myJson.arr[i].created_at);
+        }
+        datesArray = datesArray.reverse();
+
+        getArrays(datesArray);
+      }
+
+      getArrays = allDates => {
+        let allDatesFormatted = [];
+
+        for (let i = 0; i < allDates.length; i++) {
+          allDatesFormatted.push(moment.utc(allDates[i]).format("YYYY-MM-DD"));
+        }
+
+        let dates = [];
+        let pulls = [];
+
+        let i = 0,
+          j = 0,
+          k = 0,
+          l = 0,
+          pullc = 0,
+          datec = 0;
+
+        while (
+          i <= allDatesFormatted.length - 1 &&
+          j <= allDatesFormatted.length - 1
+        ) {
+          // if (allDates[i] === allDates[j]) {
+
+          if (
+            moment(allDatesFormatted[i]).isSame(allDatesFormatted[j], "day")
+          ) {
+            pullc++;
+            pulls[k] = pullc;
+            dates[l] = allDatesFormatted[j];
+            j++;
+          } else {
+            i = j;
+            k++;
+            l++;
+            pullc = 0;
+          }
+        }
+
+        for (let i = 0; i < dates.length; i++) {
+          dates[i] = moment(dates[i]).format("Do-MMM-YY");
+        }
+
+        // console.log("all dates: ", allDatesFormatted);
+        // console.log("dates: ", dates);
+        // console.log("pulls: ", pulls);
+        drawChart(dates, pulls);
+      };
+
+      drawChart = (dates, pulls) => {
+        // document.getElementById("loader").classList.add("hidden");
+        document.getElementById("loader").remove();
+        document.getElementById("getbutton").disabled = false;
+        document.getElementById("selectPullsType").disabled = false;
+        document.getElementById("selectDays").disabled = false;
+
+        let labels = [...dates];
+        let series = [[...pulls]];
+
+        let data = { labels, series };
+
+        let wid = dates.length * 88 + 50 + "px";
+
+        // console.log(wid);
+
+        var options = {
+          // This option will be used when finding the right scale division settings. The amount of ticks on the scale will be determined so that as many ticks as possible will be displayed, while not violating this minimum required space (in pixel).
+          scaleMinSpace: 200,
+          // Can be set to true or false. If set to true, the scale will be generated with whole numbers only.
+          onlyInteger: true,
+
+          axisY: {
+            onlyInteger: true
+          },
+
+          // lineSmooth: Chartist.Interpolation.cardinal({
+          //   tension: 0.2
+          // }),
+          // The reference value can be used to make sure that this value will always be on the chart. This is especially useful on bipolar charts where the bipolar center always needs to be part of the chart.
+          // referenceValue: 5,
+          width: wid,
+          height: "300px"
+        };
+
+        new Chartist.Line(".ct-chart", data, options);
+      };
+    </script>
+  </body>
+</html>
